@@ -140,6 +140,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     }
   },
 
+  // 缓存管理
+  cache: {
+    clearAnalytics: () => ipcRenderer.invoke('cache:clearAnalytics'),
+    clearImages: () => ipcRenderer.invoke('cache:clearImages'),
+    clearAll: () => ipcRenderer.invoke('cache:clearAll')
+  },
+
   // 群聊分析
   groupAnalytics: {
     getGroupChats: () => ipcRenderer.invoke('groupAnalytics:getGroupChats'),

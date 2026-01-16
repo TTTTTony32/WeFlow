@@ -148,6 +148,11 @@ export interface ElectronAPI {
     }>
     onProgress: (callback: (payload: { status: string; progress: number }) => void) => () => void
   }
+  cache: {
+    clearAnalytics: () => Promise<{ success: boolean; error?: string }>
+    clearImages: () => Promise<{ success: boolean; error?: string }>
+    clearAll: () => Promise<{ success: boolean; error?: string }>
+  }
   groupAnalytics: {
     getGroupChats: () => Promise<{
       success: boolean

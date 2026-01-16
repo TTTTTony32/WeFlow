@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAppStore } from '../stores/appStore'
 import { useThemeStore, themes } from '../stores/themeStore'
+import { useAnalyticsStore } from '../stores/analyticsStore'
 import { dialog } from '../services/ipc'
 import * as configService from '../services/config'
 import {
@@ -27,6 +28,7 @@ interface WxidOption {
 function SettingsPage() {
   const { setDbConnected, setLoading, reset } = useAppStore()
   const { currentTheme, themeMode, setTheme, setThemeMode } = useThemeStore()
+  const clearAnalyticsStoreCache = useAnalyticsStore((state) => state.clearCache)
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance')
   const [decryptKey, setDecryptKey] = useState('')
@@ -55,6 +57,11 @@ function SettingsPage() {
   const [dbKeyStatus, setDbKeyStatus] = useState('')
   const [imageKeyStatus, setImageKeyStatus] = useState('')
   const [isManualStartPrompt, setIsManualStartPrompt] = useState(false)
+  const [isClearingAnalyticsCache, setIsClearingAnalyticsCache] = useState(false)
+  const [isClearingImageCache, setIsClearingImageCache] = useState(false)
+  const [isClearingAllCache, setIsClearingAllCache] = useState(false)
+
+  const isClearingCache = isClearingAnalyticsCache || isClearingImageCache || isClearingAllCache
 
   useEffect(() => {
     loadConfig()
@@ -428,6 +435,59 @@ function SettingsPage() {
     }
   }
 
+  const handleClearAnalyticsCache = async () => {
+    if (isClearingCache) return
+    setIsClearingAnalyticsCache(true)
+    try {
+      const result = await window.electronAPI.cache.clearAnalytics()
+      if (result.success) {
+        clearAnalyticsStoreCache()
+        showMessage('已清除分析缓存', true)
+      } else {
+        showMessage(`清除分析缓存失败: ${result.error || '未知错误'}`, false)
+      }
+    } catch (e) {
+      showMessage(`清除分析缓存失败: ${e}`, false)
+    } finally {
+      setIsClearingAnalyticsCache(false)
+    }
+  }
+
+  const handleClearImageCache = async () => {
+    if (isClearingCache) return
+    setIsClearingImageCache(true)
+    try {
+      const result = await window.electronAPI.cache.clearImages()
+      if (result.success) {
+        showMessage('已清除图片缓存', true)
+      } else {
+        showMessage(`清除图片缓存失败: ${result.error || '未知错误'}`, false)
+      }
+    } catch (e) {
+      showMessage(`清除图片缓存失败: ${e}`, false)
+    } finally {
+      setIsClearingImageCache(false)
+    }
+  }
+
+  const handleClearAllCache = async () => {
+    if (isClearingCache) return
+    setIsClearingAllCache(true)
+    try {
+      const result = await window.electronAPI.cache.clearAll()
+      if (result.success) {
+        clearAnalyticsStoreCache()
+        showMessage('已清除所有缓存', true)
+      } else {
+        showMessage(`清除所有缓存失败: ${result.error || '未知错误'}`, false)
+      }
+    } catch (e) {
+      showMessage(`清除所有缓存失败: ${e}`, false)
+    } finally {
+      setIsClearingAllCache(false)
+    }
+  }
+
   const renderAppearanceTab = () => (
     <div className="tab-content">
       <div className="theme-mode-toggle">
@@ -597,9 +657,15 @@ function SettingsPage() {
     <div className="tab-content">
       <p className="section-desc">管理应用缓存数据</p>
       <div className="btn-row">
-        <button className="btn btn-secondary"><Trash2 size={16} /> 清除分析缓存</button>
-        <button className="btn btn-secondary"><Trash2 size={16} /> 清除图片缓存</button>
-        <button className="btn btn-danger"><Trash2 size={16} /> 清除所有缓存</button>
+        <button className="btn btn-secondary" onClick={handleClearAnalyticsCache} disabled={isClearingCache}>
+          <Trash2 size={16} /> 清除分析缓存
+        </button>
+        <button className="btn btn-secondary" onClick={handleClearImageCache} disabled={isClearingCache}>
+          <Trash2 size={16} /> 清除图片缓存
+        </button>
+        <button className="btn btn-danger" onClick={handleClearAllCache} disabled={isClearingCache}>
+          <Trash2 size={16} /> 清除所有缓存
+        </button>
       </div>
       <div className="divider" />
       <p className="section-desc">清除当前配置并重新开始首次引导</p>

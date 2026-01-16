@@ -482,6 +482,40 @@ function registerIpcHandlers() {
     return analyticsService.getTimeDistribution()
   })
 
+  // 缓存管理
+  ipcMain.handle('cache:clearAnalytics', async () => {
+    return analyticsService.clearCache()
+  })
+
+  ipcMain.handle('cache:clearImages', async () => {
+    const imageResult = await imageDecryptService.clearCache()
+    const emojiResult = chatService.clearCaches({ includeMessages: false, includeContacts: false, includeEmojis: true })
+    const errors = [imageResult, emojiResult]
+      .filter((result) => !result.success)
+      .map((result) => result.error)
+      .filter(Boolean) as string[]
+    if (errors.length > 0) {
+      return { success: false, error: errors.join('; ') }
+    }
+    return { success: true }
+  })
+
+  ipcMain.handle('cache:clearAll', async () => {
+    const [analyticsResult, imageResult] = await Promise.all([
+      analyticsService.clearCache(),
+      imageDecryptService.clearCache()
+    ])
+    const chatResult = chatService.clearCaches()
+    const errors = [analyticsResult, imageResult, chatResult]
+      .filter((result) => !result.success)
+      .map((result) => result.error)
+      .filter(Boolean) as string[]
+    if (errors.length > 0) {
+      return { success: false, error: errors.join('; ') }
+    }
+    return { success: true }
+  })
+
   // 群聊分析相关
   ipcMain.handle('groupAnalytics:getGroupChats', async () => {
     return groupAnalyticsService.getGroupChats()

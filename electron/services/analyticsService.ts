@@ -1,7 +1,7 @@
 import { ConfigService } from './config'
 import { wcdbService } from './wcdbService'
 import { join } from 'path'
-import { readFile, writeFile } from 'fs/promises'
+import { readFile, writeFile, rm } from 'fs/promises'
 import { app } from 'electron'
 
 export interface ChatStatistics {
@@ -524,6 +524,18 @@ class AnalyticsService {
           monthlyDistribution: d.monthly
         }
       }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async clearCache(): Promise<{ success: boolean; error?: string }> {
+    this.aggregateCache = null
+    this.fallbackAggregateCache = null
+    this.aggregatePromise = null
+    try {
+      await rm(this.getCacheFilePath(), { force: true })
+      return { success: true }
     } catch (e) {
       return { success: false, error: String(e) }
     }

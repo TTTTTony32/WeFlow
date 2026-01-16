@@ -1,5 +1,5 @@
 import { join, dirname } from 'path'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'fs'
 import { app } from 'electron'
 
 export interface ContactCacheEntry {
@@ -70,6 +70,15 @@ export class ContactCacheService {
       writeFileSync(this.cacheFilePath, JSON.stringify(this.cache), 'utf8')
     } catch (error) {
       console.error('ContactCacheService: 保存缓存失败', error)
+    }
+  }
+
+  clear(): void {
+    this.cache = {}
+    try {
+      rmSync(this.cacheFilePath, { force: true })
+    } catch (error) {
+      console.error('ContactCacheService: 清理缓存失败', error)
     }
   }
 }

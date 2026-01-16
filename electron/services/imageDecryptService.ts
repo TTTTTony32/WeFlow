@@ -2,7 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { basename, dirname, extname, join } from 'path'
 import { pathToFileURL } from 'url'
 import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, appendFileSync } from 'fs'
-import { writeFile } from 'fs/promises'
+import { writeFile, rm, readdir } from 'fs/promises'
 import crypto from 'crypto'
 import { Worker } from 'worker_threads'
 import { ConfigService } from './config'
@@ -1645,6 +1645,71 @@ export class ImageDecryptService {
     }
 
     await writeFile(outputPath, decrypted)
+  }
+
+  async clearCache(): Promise<{ success: boolean; error?: string }> {
+    this.resolvedCache.clear()
+    this.hardlinkCache.clear()
+    this.pending.clear()
+    this.updateFlags.clear()
+    this.cacheIndexed = false
+    this.cacheIndexing = null
+
+    const configured = this.configService.get('cachePath')
+    const root = configured
+      ? join(configured, 'Images')
+      : join(app.getPath('documents'), 'WeFlow', 'Images')
+
+    try {
+      if (!existsSync(root)) {
+        return { success: true }
+      }
+      const monthPattern = /^\d{4}-\d{2}$/
+      const clearFilesInDir = async (dirPath: string): Promise<void> => {
+        let entries: Array<{ name: string; isDirectory: () => boolean }>
+        try {
+          entries = await readdir(dirPath, { withFileTypes: true })
+        } catch {
+          return
+        }
+        for (const entry of entries) {
+          const fullPath = join(dirPath, entry.name)
+          if (entry.isDirectory()) {
+            await clearFilesInDir(fullPath)
+            continue
+          }
+          try {
+            await rm(fullPath, { force: true })
+          } catch { }
+        }
+      }
+      const traverse = async (dirPath: string): Promise<void> => {
+        let entries: Array<{ name: string; isDirectory: () => boolean }>
+        try {
+          entries = await readdir(dirPath, { withFileTypes: true })
+        } catch {
+          return
+        }
+        for (const entry of entries) {
+          const fullPath = join(dirPath, entry.name)
+          if (entry.isDirectory()) {
+            if (monthPattern.test(entry.name)) {
+              await clearFilesInDir(fullPath)
+            } else {
+              await traverse(fullPath)
+            }
+            continue
+          }
+          try {
+            await rm(fullPath, { force: true })
+          } catch { }
+        }
+      }
+      await traverse(root)
+      return { success: true }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
   }
 }
 
