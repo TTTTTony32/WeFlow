@@ -259,9 +259,41 @@ class ExportService {
   }
 
   private cleanSystemMessage(content: string): string {
+    if (!content) return '[系统消息]'
+    
+    // 先尝试提取特定的系统消息内容
+    // 1. 提取 sysmsg 中的文本内容
+    const sysmsgTextMatch = /<sysmsg[^>]*>([\s\S]*?)<\/sysmsg>/i.exec(content)
+    if (sysmsgTextMatch) {
+      content = sysmsgTextMatch[1]
+    }
+    
+    // 2. 提取 revokemsg 撤回消息
+    const revokeMatch = /<replacemsg><!\[CDATA\[(.*?)\]\]><\/replacemsg>/i.exec(content)
+    if (revokeMatch) {
+      return revokeMatch[1].trim()
+    }
+    
+    // 3. 提取 pat 拍一拍消息
+    const patMatch = /<template><!\[CDATA\[(.*?)\]\]><\/template>/i.exec(content)
+    if (patMatch) {
+      // 移除模板变量占位符
+      return patMatch[1]
+        .replace(/\$\{([^}]+)\}/g, (_, varName) => {
+          const varMatch = new RegExp(`<${varName}><!\\\[CDATA\\\[([^\]]*)\\\]\\\]><\/${varName}>`, 'i').exec(content)
+          return varMatch ? varMatch[1] : ''
+        })
+        .replace(/<[^>]+>/g, '')
+        .trim()
+    }
+    
+    // 4. 处理 CDATA 内容
+    content = content.replace(/<!\[CDATA\[/g, '').replace(/\]\]>/g, '')
+    
+    // 5. 移除所有 XML 标签
     return content
       .replace(/<img[^>]*>/gi, '')
-      .replace(/<\/?[a-zA-Z0-9_]+[^>]*>/g, '')
+      .replace(/<\/?[a-zA-Z0-9_:]+[^>]*>/g, '')
       .replace(/\s+/g, ' ')
       .trim() || '[系统消息]'
   }
@@ -913,6 +945,11 @@ class ExportService {
 
       const sessionInfo = await this.getContactInfo(sessionId)
       const myInfo = await this.getContactInfo(cleanedMyWxid)
+      
+      // 获取会话的备注信息
+      const sessionContact = await wcdbService.getContact(sessionId)
+      const sessionRemark = sessionContact.success && sessionContact.contact?.remark ? sessionContact.contact.remark : ''
+      const sessionNickname = sessionContact.success && sessionContact.contact?.nickName ? sessionContact.contact.nickName : sessionId
 
       onProgress?.({
         current: 0,
@@ -957,14 +994,14 @@ class ExportService {
       
       worksheet.getCell(currentRow, 4).value = '昵称'
       worksheet.getCell(currentRow, 4).font = { name: 'Calibri', bold: true, size: 11 }
-      worksheet.getCell(currentRow, 5).value = sessionInfo.displayName
+      worksheet.getCell(currentRow, 5).value = sessionNickname
       worksheet.getCell(currentRow, 5).font = { name: 'Calibri', size: 11 }
       
       if (isGroup) {
         worksheet.getCell(currentRow, 6).value = '备注'
         worksheet.getCell(currentRow, 6).font = { name: 'Calibri', bold: true, size: 11 }
         worksheet.mergeCells(currentRow, 7, currentRow, 8)
-        worksheet.getCell(currentRow, 7).value = '微信开发交流群'
+        worksheet.getCell(currentRow, 7).value = sessionRemark
         worksheet.getCell(currentRow, 7).font = { name: 'Calibri', size: 11 }
       }
       worksheet.getRow(currentRow).height = 20
